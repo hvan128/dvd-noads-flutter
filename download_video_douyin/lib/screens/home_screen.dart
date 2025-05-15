@@ -27,6 +27,22 @@ class _HomeScreenState extends State<HomeScreen> {
     _initSharedIntent();
   }
 
+  int _secondsElapsed = 0;
+  Timer? _timer;
+  void _startTimer() {
+    _secondsElapsed = 0;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _secondsElapsed++;
+      });
+    });
+  }
+
+  void _stopTimer() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
   // Kiểm tra URL được chia sẻ
   void _initSharedIntent() {
     // Lắng nghe các intent được gửi đến ứng dụng
@@ -90,17 +106,19 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
+      _startTimer();
     });
 
     try {
       final video = await _douyinService.getVideoInfo(url);
-      
+
       if (!mounted) return;
-      
+
       setState(() {
         _isLoading = false;
+        _stopTimer();
       });
-      
+
       // Chuyển đến màn hình chi tiết video
       Navigator.push(
         context,
@@ -160,7 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 40),
-            
+
             // Trường nhập URL
             TextField(
               controller: _urlController,
@@ -179,7 +197,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onSubmitted: (_) => _getVideoInfo(),
             ),
             const SizedBox(height: 8),
-            
+
             // Hiển thị thông báo lỗi nếu có
             if (_errorMessage.isNotEmpty)
               Padding(
@@ -189,9 +207,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: const TextStyle(color: Colors.red),
                 ),
               ),
-            
+
             const SizedBox(height: 20),
-            
+
             // Nút tải video
             ElevatedButton(
               onPressed: _isLoading ? null : _getVideoInfo,
@@ -199,15 +217,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: _isLoading
-                  ? const CircularProgressIndicator()
+                  ? Text(
+                      'Đang tải... $_secondsElapsed giây',
+                      style: const TextStyle(fontSize: 16),
+                    )
                   : const Text(
                       'Lấy thông tin video',
                       style: TextStyle(fontSize: 16),
                     ),
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Hướng dẫn sử dụng
             const Expanded(
               child: SingleChildScrollView(
@@ -243,6 +264,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _urlController.dispose();
     _intentDataStreamSubscription?.cancel();
+    _stopTimer();
     super.dispose();
   }
 }

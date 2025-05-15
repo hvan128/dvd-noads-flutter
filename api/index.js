@@ -9,6 +9,8 @@ const fs = require('fs');
 const path = require('path');
 const AdmZip = require('adm-zip');
 const { v4: uuidv4 } = require('uuid');
+const { cleanUrl, extractVideoId, generateRandomMSToken } = require('./utils/urlUtils');
+const { downloadFile, downloadAndZipImages } = require('./utils/fileUtils');
 
 // Sử dụng plugin Stealth để tránh phát hiện bot
 puppeteer.use(StealthPlugin());
@@ -27,123 +29,6 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use('/downloads', express.static(DOWNLOAD_DIR));
 
-/**
- * Làm sạch URL Douyin từ chuỗi đầu vào
- * @param {string} url URL đầu vào từ người dùng
- * @returns {string} URL Douyin đã làm sạch
- */
-function cleanUrl(url) {
-  // Tìm URL Douyin trong chuỗi đầu vào
-  const douyinUrlMatch = url.match(/https?:\/\/v\.douyin\.com\/[a-zA-Z0-9]+/);
-  if (douyinUrlMatch) {
-    return douyinUrlMatch[0];
-  }
-  
-  // Nếu đã là URL đầy đủ của Douyin
-  if (url.startsWith('https://www.douyin.com/')) {
-    return url;
-  }
-  
-  return url; // Trả về URL gốc nếu không tìm thấy mẫu nào
-}
-
-/**
- * Trích xuất ID video từ URL Douyin
- * @param {string} url URL Douyin
- * @returns {string|null} ID video hoặc null nếu không tìm thấy
- */
-function extractVideoId(url) {
-  // Mẫu cho URL dạng /video/{id} hoặc /note/{id}
-  const videoPattern = url.match(/\/(?:video|note)\/(\d+)/);
-  if (videoPattern) {
-    return videoPattern[1];
-  }
-  
-  // Mẫu cho tham số aweme_id trong URL
-  const awemePattern = url.match(/aweme_id=(\d+)/);
-  if (awemePattern) {
-    return awemePattern[1];
-  }
-  
-  // Mẫu cho tham số vid trong URL
-  const vidPattern = url.match(/vid=(\d+)/);
-  if (vidPattern) {
-    return vidPattern[1];
-  }
-  
-  return null;
-}
-
-/**
- * Tải xuống file từ URL
- * @param {string} url URL của file cần tải
- * @param {string} outputPath Đường dẫn lưu file
- * @returns {Promise<void>}
- */
-async function downloadFile(url, outputPath) {
-  const response = await axios({
-    method: 'GET',
-    url: url,
-    responseType: 'stream',
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': '*/*',
-      'Accept-Encoding': 'identity;q=1, *;q=0',
-      'Range': 'bytes=0-',
-      'Referer': 'https://www.douyin.com/'
-    }
-  });
-
-  const writer = fs.createWriteStream(outputPath);
-  response.data.pipe(writer);
-
-  return new Promise((resolve, reject) => {
-    writer.on('finish', resolve);
-    writer.on('error', reject);
-  });
-}
-
-/**
- * Tải xuống nhiều hình ảnh và nén thành file ZIP
- * @param {Array<string>} imageUrls Mảng các URL hình ảnh
- * @param {string} outputPath Đường dẫn lưu file ZIP
- * @returns {Promise<void>}
- */
-async function downloadAndZipImages(imageUrls, outputPath) {
-  const tempDir = path.join(DOWNLOAD_DIR, 'temp_' + uuidv4());
-  fs.mkdirSync(tempDir, { recursive: true });
-  
-  try {
-    // Tải từng hình ảnh
-    for (let i = 0; i < imageUrls.length; i++) {
-      const imageUrl = imageUrls[i];
-      const imagePath = path.join(tempDir, `image_${i + 1}.jpg`);
-      await downloadFile(imageUrl, imagePath);
-    }
-    
-    // Tạo file ZIP
-    const zip = new AdmZip();
-    const files = fs.readdirSync(tempDir);
-    
-    files.forEach(file => {
-      const filePath = path.join(tempDir, file);
-      zip.addLocalFile(filePath);
-    });
-    
-    // Lưu file ZIP
-    zip.writeZip(outputPath);
-    
-    // Xóa thư mục tạm
-    fs.rmSync(tempDir, { recursive: true, force: true });
-    
-  } catch (error) {
-    // Đảm bảo xóa thư mục tạm nếu có lỗi
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
-    throw error;
-  }
-}
 
 /**
  * Thực hiện truy vấn API riêng cho video Douyin
@@ -166,7 +51,10 @@ async function fetchVideoDataDirectly(videoId) {
     // URL của API video chi tiết
     const apiUrl = `https://www.douyin.com/aweme/v1/web/aweme/detail/?device_platform=webapp&aid=6383&channel=channel_pc_web&aweme_id=${videoId}&pc_client_type=1&version_code=170400&version_name=17.4.0&cookie_enabled=true&screen_width=1920&screen_height=1080&browser_language=en-US&browser_platform=Win32&browser_name=Chrome&browser_version=120.0.0.0&browser_online=true&engine_name=Blink&engine_version=120.0.0.0&os_name=Windows&os_version=10&cpu_core_num=16&device_memory=8&platform=PC&downlink=10&effective_type=4g&round_trip_time=50&webid=7129360599857284651&msToken=${generateRandomMSToken()}`;
     
-    const response = await axios.get(apiUrl, { headers });
+    const response = await axios.get(apiUrl, { 
+      headers,
+      timeout: 10000 // Giảm timeout xuống 10 giây
+    });
     
     if (response.data && response.data.aweme_detail) {
       return response.data;
@@ -180,19 +68,6 @@ async function fetchVideoDataDirectly(videoId) {
 }
 
 /**
- * Tạo token ngẫu nhiên cho API Douyin
- * @returns {string} Token ngẫu nhiên
- */
-function generateRandomMSToken() {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < 107; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
-  }
-  return result;
-}
-
-/**
  * Lấy dữ liệu video từ trang video Douyin bằng puppeteer
  * @param {string} videoId ID video
  * @returns {Promise<Object|null>} Dữ liệu video hoặc null nếu thất bại
@@ -203,10 +78,12 @@ async function getVideoDataUsingPuppeteer(videoId) {
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
   
+  let page = null;
+  
   try {
     console.log(`[INFO] Sử dụng puppeteer để lấy dữ liệu video ID: ${videoId}`);
     
-    const page = await browser.newPage();
+    page = await browser.newPage();
     
     // Đặt User-Agent
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
@@ -214,15 +91,26 @@ async function getVideoDataUsingPuppeteer(videoId) {
     // Biến để lưu trữ dữ liệu từ API
     let videoData = null;
     
+    // Flag để theo dõi khi nào đã tìm thấy dữ liệu
+    let dataFound = false;
+    
     // Chặn response từ API chi tiết video
     await page.setRequestInterception(true);
     
     page.on('request', request => {
-      request.continue();
+      // Chỉ tiếp tục các request nếu chưa tìm thấy dữ liệu
+      if (dataFound) {
+        request.abort();
+      } else {
+        request.continue();
+      }
     });
     
     // Chặn tất cả các response để tìm dữ liệu video
     page.on('response', async response => {
+      // Nếu đã tìm thấy dữ liệu, không xử lý thêm
+      if (dataFound) return;
+      
       const url = response.url();
       
       // Kiểm tra nhiều API endpoint có thể chứa dữ liệu video
@@ -237,6 +125,7 @@ async function getVideoDataUsingPuppeteer(videoId) {
               if ((responseData.aweme_detail) || 
                   (responseData.item_list && responseData.item_list.length > 0)) {
                 videoData = responseData;
+                dataFound = true;
                 console.log('[INFO] Đã bắt được dữ liệu video từ API response');
               }
             } catch (jsonError) {
@@ -248,66 +137,23 @@ async function getVideoDataUsingPuppeteer(videoId) {
         }
       }
       
-      // Tìm script chứa dữ liệu video nhúng
-      if (url.includes('.douyin.com') && response.headers()['content-type']?.includes('text/html')) {
-        try {
-          const html = await response.text();
-          // Tìm kiếm dữ liệu video nhúng trong script tags
-          const renderDataMatch = html.match(/window\.__RENDER_DATA__\s*=\s*([^<]+)(<\/script>|;)/);
-          if (renderDataMatch && renderDataMatch[1]) {
-            try {
-              const decodedData = decodeURIComponent(renderDataMatch[1]);
-              const jsonData = JSON.parse(decodedData);
-              
-              // Tìm dữ liệu video trong cấu trúc phức tạp
-              let foundData = null;
-              const searchForVideoData = (obj) => {
-                if (!obj || typeof obj !== 'object') return;
-                
-                if (obj.aweme_detail || 
-                   (obj.aweme && obj.aweme.detail) ||
-                   (obj.aweme_list && obj.aweme_list.length > 0)) {
-                  foundData = obj;
-                  return;
-                }
-                
-                for (const key in obj) {
-                  searchForVideoData(obj[key]);
-                  if (foundData) break;
-                }
-              };
-              
-              searchForVideoData(jsonData);
-              
-              if (foundData) {
-                console.log('[INFO] Đã tìm thấy dữ liệu video trong RENDER_DATA');
-                if (foundData.aweme_detail) {
-                  videoData = { aweme_detail: foundData.aweme_detail };
-                } else if (foundData.aweme && foundData.aweme.detail) {
-                  videoData = { aweme_detail: foundData.aweme.detail };
-                } else if (foundData.aweme_list && foundData.aweme_list.length > 0) {
-                  videoData = { aweme_detail: foundData.aweme_list[0] };
-                }
-              }
-            } catch (jsonError) {
-              console.error('[ERROR] Không thể phân tích dữ liệu RENDER_DATA:', jsonError);
-            }
-          }
-        } catch (error) {
-          console.error('[ERROR] Không thể đọc HTML để tìm dữ liệu nhúng:', error);
-        }
-      }
     });
     
     // Truy cập trang video
     const videoUrl = `https://www.douyin.com/video/${videoId}`;
-    await page.goto(videoUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.goto(videoUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
     console.log(`[INFO] Đã truy cập trang video: ${videoUrl}`);
     
-    // Chờ thêm thời gian để tất cả API có thể load
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    // Chờ thêm thời gian nhưng giảm xuống chỉ còn 2 giây
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Trích xuất video URLs từ thẻ video trong trang
+    // Nếu đã tìm thấy dữ liệu, không cần thực hiện các bước phức tạp khác
+    if (dataFound && videoData && videoData.aweme_detail) {
+      console.log('[INFO] Đã tìm thấy dữ liệu, bỏ qua các bước trích xuất khác');
+      return videoData;
+    }
+    
+    // Trích xuất video URLs từ thẻ video trong trang (chỉ khi chưa tìm thấy dữ liệu)
     if (!videoData || !videoData.aweme_detail || !videoData.aweme_detail.video) {
       console.log('[INFO] Thử trích xuất video URL từ các phần tử trong trang...');
       
@@ -359,7 +205,9 @@ async function getVideoDataUsingPuppeteer(videoId) {
     console.error('[ERROR] Lỗi khi sử dụng puppeteer:', error);
     return null;
   } finally {
-    await browser.close();
+    // Đảm bảo đóng trang và browser để giải phóng tài nguyên
+    if (page) await page.close().catch(() => {});
+    await browser.close().catch(() => {});
   }
 }
 
@@ -376,79 +224,50 @@ app.post('/api/info', async (req, res) => {
     
     // Làm sạch URL đầu vào
     const cleanedUrl = cleanUrl(url);
-    console.log(`[INFO] Đang truy cập URL đã làm sạch: ${cleanedUrl}`);
+    console.log(`[INFO] Đang xử lý URL đã làm sạch: ${cleanedUrl}`);
     
-    // Khởi tạo trình duyệt
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    // Trích xuất ID video từ URL (nếu có thể)
+    let videoId = extractVideoId(cleanedUrl);
     
-    const page = await browser.newPage();
-    
-    // Đặt User-Agent
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-    
-    // Biến để lưu trữ dữ liệu từ API
-    let videoData = null;
-    
-    // Chặn response từ API chi tiết video
-    await page.setRequestInterception(true);
-    
-    page.on('request', request => {
-      request.continue();
-    });
-    
-    page.on('response', async response => {
-      const url = response.url();
-      if (url.includes('aweme/v1/web/aweme/detail')) {
-        try {
-          // Thêm kiểm tra nội dung trước khi phân tích JSON
-          const text = await response.text();
-          if (text && text.trim() !== '') {
-            try {
-              const responseData = JSON.parse(text);
-              if (responseData && responseData.aweme_detail) {
-                videoData = responseData;
-              }
-            } catch (jsonError) {
-              console.error('[ERROR] Không thể phân tích JSON từ response:', jsonError);
-            }
+    // Nếu không tìm thấy ID trực tiếp, thực hiện quick check để lấy URL chuyển hướng
+    if (!videoId) {
+      try {
+        // Sử dụng axios để lấy URL sau khi chuyển hướng mà không cần Puppeteer
+        const response = await axios.get(cleanedUrl, {
+          maxRedirects: 5,
+          timeout: 10000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
           }
-        } catch (error) {
-          console.error('[ERROR] Không thể đọc nội dung response:', error);
-        }
+        });
+        
+        // Lấy URL cuối cùng sau khi chuyển hướng
+        const finalUrl = response.request.res.responseUrl;
+        console.log(`[INFO] URL sau khi chuyển hướng: ${finalUrl}`);
+        
+        // Trích xuất ID video từ URL chuyển hướng
+        videoId = extractVideoId(finalUrl);
+      } catch (error) {
+        console.error('[ERROR] Lỗi khi lấy URL chuyển hướng:', error.message);
+        // Tiếp tục với code flow, có thể videoId sẽ được tìm thấy bằng cách khác
       }
-    });
+    }
     
-    // Truy cập URL
-    await page.goto(cleanedUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    if (!videoId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Không thể xác định ID video từ URL cung cấp' 
+      });
+    }
     
-    // Chờ xử lý JavaScript
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    console.log(`[INFO] Đã tìm thấy video ID: ${videoId}`);
     
-    // Xử lý chuyển hướng nếu cần
-    const currentUrl = page.url();
-    console.log(`[INFO] URL sau khi chuyển hướng: ${currentUrl}`);
+    // Đi thẳng đến phương pháp hiệu quả
+    let videoData = await fetchVideoDataDirectly(videoId);
     
-    // Đóng trình duyệt ban đầu để giải phóng tài nguyên
-    await browser.close();
-    
-    // Tìm ID video từ URL
-    const videoId = extractVideoId(currentUrl);
-    
-    // Nếu không nhận được dữ liệu từ API, thử các phương pháp khác
-    if (!videoData && videoId) {
-      console.log('[INFO] Không nhận được dữ liệu từ API, đang thử phương pháp thay thế...');
-      console.log(`[INFO] Đã tìm thấy video ID: ${videoId}`);
-      
-      // Phương pháp 1: Truy vấn API trực tiếp
-      videoData = await fetchVideoDataDirectly(videoId);
-      
-      // Phương pháp 2: Sử dụng puppeteer để lấy dữ liệu từ trang video chính
-      if (!videoData) {
-        videoData = await getVideoDataUsingPuppeteer(videoId);
-      }
+    // Nếu vẫn không thành công, thử phương pháp cuối cùng
+    if (!videoData) {
+      videoData = await getVideoDataUsingPuppeteer(videoId);
     }
     
     // Kiểm tra dữ liệu và trả về
@@ -512,7 +331,7 @@ app.post('/api/info', async (req, res) => {
       result.data.videoUrl = videoUrl;
       
       // Nếu không có URL video hợp lệ, trả về lỗi
-      if (!videoUrl || videoUrl === currentUrl) {
+      if (!videoUrl) {
         return res.status(404).json({ 
           success: false, 
           message: 'Không thể trích xuất URL video. Video có thể đã bị giới hạn hoặc không có sẵn.'
@@ -613,7 +432,8 @@ app.post('/api/download', async (req, res) => {
     } else {
       // Tải và nén hình ảnh
       filePath = path.join(DOWNLOAD_DIR, `${fileId}.zip`);
-      await downloadAndZipImages(images, filePath);
+      const tempDir = path.join(DOWNLOAD_DIR, 'temp_' + uuidv4());
+      await downloadAndZipImages(images, filePath, tempDir);
       downloadUrl = `/downloads/${fileId}.zip`;
     }
     
