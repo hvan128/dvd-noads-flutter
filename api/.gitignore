@@ -1,2 +1,7 @@
 /node_modules
 /.env
+# Loại trừ tất cả nội dung trong thư mục downloads
+/downloads/*
+
+# Nhưng giữ lại file .gitkeep
+!/downloads/.gitkeep
