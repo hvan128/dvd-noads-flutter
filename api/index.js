@@ -62,21 +62,33 @@ async function fetchVideoDataDirectly(videoId) {
  */
 async function getVideoDataUsingPuppeteer(videoId) {
   let browser;
-  console.log('[INFO] Khởi chạy browser với Puppeteer mặc định');
-  browser = await puppeteer.launch({
+  try {
+    console.log(`[INFO] Sử dụng puppeteer để lấy dữ liệu video ID: ${videoId}`);
+    
+    // Kiểm tra môi trường hiện tại (Render hay local)
+    const isRenderEnvironment = process.env.RENDER === 'true';
+    console.log(`[INFO] Đang chạy trong môi trường: ${isRenderEnvironment ? 'Render' : 'Local'}`);
+    
+    // Cấu hình khởi chạy puppeteer dựa vào môi trường
+    const launchOptions = {
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage'
       ],
-      headless: true
-    });
-  let page = null;
-  
-  try {
-    console.log(`[INFO] Sử dụng puppeteer để lấy dữ liệu video ID: ${videoId}`);
+      headless: 'new'
+    };
     
-    page = await browser.newPage();
+    // Thêm các cấu hình đặc biệt cho Render
+    if (isRenderEnvironment) {
+      console.log('[INFO] Áp dụng cấu hình đặc biệt cho môi trường Render');
+      launchOptions.args.push('--single-process', '--disable-gpu', '--no-zygote');
+      launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome';
+    }
+    
+    browser = await puppeteer.launch(launchOptions);
+    
+    const page = await browser.newPage();
     
     // Đặt User-Agent
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
@@ -198,9 +210,8 @@ async function getVideoDataUsingPuppeteer(videoId) {
     console.error('[ERROR] Lỗi khi sử dụng puppeteer:', error);
     return null;
   } finally {
-    // Đảm bảo đóng trang và browser để giải phóng tài nguyên
-    if (page) await page.close().catch(() => {});
-    await browser.close().catch(() => {});
+    // Đảm bảo đóng browser để giải phóng tài nguyên
+    if (browser) await browser.close().catch(() => {});
   }
 }
 
@@ -258,8 +269,8 @@ app.post('/api/info', async (req, res) => {
     // Đi thẳng đến phương pháp hiệu quả
     let videoData = await fetchVideoDataDirectly(videoId);
     
-    // Nếu vẫn không thành công, thử phương pháp cuối cùng
     if (!videoData) {
+      console.log('[INFO] Không thể lấy dữ liệu trực tiếp, thử dùng Puppeteer');
       videoData = await getVideoDataUsingPuppeteer(videoId);
     }
     
