@@ -5,30 +5,18 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const AdmZip = require('adm-zip');
 const { v4: uuidv4 } = require('uuid');
 const { cleanUrl, extractVideoId, generateRandomMSToken } = require('./utils/urlUtils');
-const { downloadFile, downloadAndZipImages } = require('./utils/fileUtils');
 
 // Sử dụng plugin Stealth để tránh phát hiện bot
 puppeteer.use(StealthPlugin());
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DOWNLOAD_DIR = path.join(__dirname, 'downloads');
-
-// Đảm bảo thư mục tải xuống tồn tại
-if (!fs.existsSync(DOWNLOAD_DIR)) {
-  fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
-}
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
-app.use('/downloads', express.static(DOWNLOAD_DIR));
-
 
 /**
  * Thực hiện truy vấn API riêng cho video Douyin
@@ -348,9 +336,10 @@ app.post('/api/info', async (req, res) => {
 });
 
 /**
- * API endpoint để tải video xuống
+ * API endpoint mới để trả về URL tải xuống trực tiếp
+ * Thay thế cho endpoint /api/download cũ
  */
-app.post('/api/download', async (req, res) => {
+app.post('/api/get-download-url', async (req, res) => {
   try {
     const { url, type, videoUrl, images } = req.body;
     
@@ -369,11 +358,6 @@ app.post('/api/download', async (req, res) => {
     if (type === 'images' && (!images || !Array.isArray(images) || images.length === 0)) {
       return res.status(400).json({ success: false, message: 'Danh sách hình ảnh không hợp lệ' });
     }
-    
-    // Tạo ID duy nhất cho file
-    const fileId = uuidv4();
-    let filePath;
-    let downloadUrl;
     
     if (type === 'video') {
       // Kiểm tra xem videoUrl có phải là URL thực sự của video không
@@ -425,65 +409,26 @@ app.post('/api/download', async (req, res) => {
         videoUrl = actualVideoUrl;
       }
       
-      // Tải video
-      filePath = path.join(DOWNLOAD_DIR, `${fileId}.mp4`);
-      await downloadFile(videoUrl, filePath);
-      downloadUrl = `/downloads/${fileId}.mp4`;
+      // Trả về URL video trực tiếp cho frontend
+      res.json({
+        success: true,
+        data: {
+          type: 'video',
+          url: videoUrl,
+          filename: `douyin_video_${uuidv4().slice(0, 8)}.mp4`
+        }
+      });
     } else {
-      // Tải và nén hình ảnh
-      filePath = path.join(DOWNLOAD_DIR, `${fileId}.zip`);
-      const tempDir = path.join(DOWNLOAD_DIR, 'temp_' + uuidv4());
-      await downloadAndZipImages(images, filePath, tempDir);
-      downloadUrl = `/downloads/${fileId}.zip`;
+      // Trả về danh sách URL hình ảnh cho frontend
+      res.json({
+        success: true,
+        data: {
+          type: 'images',
+          urls: images,
+          prefix: `douyin_image_${uuidv4().slice(0, 8)}`
+        }
+      });
     }
-    
-    res.json({
-      success: true,
-      data: {
-        downloadUrl,
-        expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // Hết hạn sau 24 giờ
-      }
-    });
-    
-    // Xóa file sau 24 giờ
-    setTimeout(() => {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        console.log(`[INFO] Đã xóa file: ${filePath}`);
-      }
-    }, 24 * 60 * 60 * 1000);
-    
-  } catch (error) {
-    console.error('[ERROR]', error);
-    res.status(500).json({ success: false, message: `Lỗi: ${error.message}` });
-  }
-});
-
-/**
- * API endpoint để dọn dẹp file tạm
- */
-app.get('/api/cleanup', (req, res) => {
-  try {
-    // Đọc danh sách file trong thư mục downloads
-    const files = fs.readdirSync(DOWNLOAD_DIR);
-    
-    let deleteCount = 0;
-    files.forEach(file => {
-      const filePath = path.join(DOWNLOAD_DIR, file);
-      const stats = fs.statSync(filePath);
-      const fileAge = Date.now() - stats.mtimeMs;
-      
-      // Xóa các file cũ hơn 24 giờ
-      if (fileAge > 24 * 60 * 60 * 1000) {
-        fs.unlinkSync(filePath);
-        deleteCount++;
-      }
-    });
-    
-    res.json({
-      success: true,
-      message: `Đã dọn dẹp ${deleteCount} file`
-    });
     
   } catch (error) {
     console.error('[ERROR]', error);
