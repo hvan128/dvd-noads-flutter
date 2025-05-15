@@ -61,13 +61,16 @@ async function fetchVideoDataDirectly(videoId) {
  * @returns {Promise<Object|null>} Dữ liệu video hoặc null nếu thất bại
  */
 async function getVideoDataUsingPuppeteer(videoId) {
-  const browser = await puppeteer.launch({
-  executablePath: process.env.NODE_ENV === 'production' 
-    ? '/usr/bin/chromium' 
-    : puppeteer.executablePath(),
-  args: ['--no-sandbox', '--disable-setuid-sandbox']
-});
-  
+  let browser;
+  console.log('[INFO] Khởi chạy browser với Puppeteer mặc định');
+  browser = await puppeteer.launch({
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage'
+      ],
+      headless: true
+    });
   let page = null;
   
   try {
