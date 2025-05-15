@@ -62,9 +62,11 @@ async function fetchVideoDataDirectly(videoId) {
  */
 async function getVideoDataUsingPuppeteer(videoId) {
   const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
+  executablePath: process.env.NODE_ENV === 'production' 
+    ? '/usr/bin/chromium' 
+    : puppeteer.executablePath(),
+  args: ['--no-sandbox', '--disable-setuid-sandbox']
+});
   
   let page = null;
   
