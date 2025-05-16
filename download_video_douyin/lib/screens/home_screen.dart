@@ -130,6 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _isLoading = false;
         _errorMessage = e.toString();
+        _stopTimer();
       });
     }
   }
