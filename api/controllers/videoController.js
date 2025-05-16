@@ -1,22 +1,13 @@
-/**
- * Controller functions for video operations
- */
-const { v4: uuidv4 } = require('uuid');
-const path = require('path');
-const fs = require('fs');
-const { DOWNLOAD_DIR, DOWNLOAD_EXPIRY_HOURS } = require('../config/config');
-const douyinService = require('../services/douyinService');
-const downloadService = require('../services/downloadService');
-const cleanupService = require('../services/cleanupService');
-const urlUtils = require('../utils/urlUtils');
+// controllers/videoController.js - Điều khiển các yêu cầu liên quan đến video
+const { getVideoInfo, getDownloadUrl } = require('../services/videoService');
 
 /**
- * Lấy thông tin video từ URL Douyin
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- * @param {Function} next - Next middleware function
+ * Xử lý yêu cầu lấy thông tin video
+ * @param {Object} req Request Express
+ * @param {Object} res Response Express
+ * @param {Function} next Next middleware
  */
-exports.getVideoInfo = async (req, res, next) => {
+async function getInfo(req, res, next) {
   try {
     const { url } = req.body;
     
@@ -24,34 +15,24 @@ exports.getVideoInfo = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'URL không được cung cấp' });
     }
     
-    // Làm sạch URL đầu vào
-    const cleanedUrl = urlUtils.cleanUrl(url);
-    console.log(`[INFO] Đang truy cập URL đã làm sạch: ${cleanedUrl}`);
+    const videoData = await getVideoInfo(url);
     
-    // Lấy thông tin video
-    const videoData = await douyinService.fetchVideoInfo(cleanedUrl);
-    
-    if (!videoData) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Không thể lấy dữ liệu từ video Douyin. Liên kết có thể không hợp lệ hoặc đã hết hạn.'
-      });
-    }
-    
-    res.json(videoData);
-    
+    res.json({
+      success: true,
+      data: videoData
+    });
   } catch (error) {
     next(error);
   }
-};
+}
 
 /**
- * Tải xuống video hoặc hình ảnh
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- * @param {Function} next - Next middleware function
+ * Xử lý yêu cầu lấy URL tải xuống
+ * @param {Object} req Request Express
+ * @param {Object} res Response Express
+ * @param {Function} next Next middleware
  */
-exports.downloadContent = async (req, res, next) => {
+async function getDownload(req, res, next) {
   try {
     const { url, type, videoUrl, images } = req.body;
     
@@ -71,60 +52,18 @@ exports.downloadContent = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Danh sách hình ảnh không hợp lệ' });
     }
     
-    // Tạo ID duy nhất cho file
-    const fileId = uuidv4();
-    let filePath;
-    let downloadUrl;
-    
-    if (type === 'video') {
-      // Xử lý và tải video
-      const result = await downloadService.downloadVideo(url, videoUrl, fileId);
-      filePath = result.filePath;
-      downloadUrl = result.downloadUrl;
-    } else {
-      // Tải và nén hình ảnh
-      const result = await downloadService.downloadAndZipImages(images, fileId);
-      filePath = result.filePath;
-      downloadUrl = result.downloadUrl;
-    }
+    const downloadData = await getDownloadUrl({ url, type, videoUrl, images });
     
     res.json({
       success: true,
-      data: {
-        downloadUrl,
-        expireAt: new Date(Date.now() + DOWNLOAD_EXPIRY_HOURS * 60 * 60 * 1000)
-      }
+      data: downloadData
     });
-    
-    // Xóa file sau thời gian hết hạn
-    setTimeout(() => {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        console.log(`[INFO] Đã xóa file: ${filePath}`);
-      }
-    }, DOWNLOAD_EXPIRY_HOURS * 60 * 60 * 1000);
-    
   } catch (error) {
     next(error);
   }
-};
+}
 
-/**
- * Dọn dẹp file tạm
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- * @param {Function} next - Next middleware function
- */
-exports.cleanupFiles = async (req, res, next) => {
-  try {
-    const deleteCount = await cleanupService.cleanupExpiredFiles();
-    
-    res.json({
-      success: true,
-      message: `Đã dọn dẹp ${deleteCount} file`
-    });
-    
-  } catch (error) {
-    next(error);
-  }
+module.exports = {
+  getInfo,
+  getDownload
 };

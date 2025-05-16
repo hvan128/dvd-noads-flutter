@@ -1,17 +1,12 @@
-/**
- * API route definitions
- */
+// routes/api.js - Các API endpoint
 const express = require('express');
 const router = express.Router();
 const videoController = require('../controllers/videoController');
 
-// Route để lấy thông tin video từ URL Douyin
-router.post('/info', videoController.getVideoInfo);
+// API lấy thông tin video
+router.post('/info', videoController.getInfo);
 
-// Route để tải video hoặc hình ảnh xuống
-router.post('/download', videoController.downloadContent);
-
-// Route để dọn dẹp file tạm
-router.get('/cleanup', videoController.cleanupFiles);
+// API lấy URL tải xuống
+router.post('/get-download-url', videoController.getDownload);
 
 module.exports = router;

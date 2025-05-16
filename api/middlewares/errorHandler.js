@@ -1,19 +1,30 @@
+// middleware/errorHandler.js - Xử lý lỗi tập trung
 /**
- * Error handling middleware
+ * Middleware xử lý lỗi tập trung
+ * @param {Error} err Đối tượng lỗi
+ * @param {Object} req Request Express
+ * @param {Object} res Response Express
+ * @param {Function} next Next middleware
  */
-
-/**
- * Global error handler for the application
- */
-module.exports = (err, req, res, next) => {
+function errorHandler(err, req, res, next) {
   console.error('[ERROR]', err);
   
-  // Set appropriate status code
+  // Xác định HTTP status code dựa trên loại lỗi
   const statusCode = err.statusCode || 500;
   
-  // Send error response
-  res.status(statusCode).json({
+  // Chuẩn bị phản hồi lỗi
+  const errorResponse = {
     success: false,
-    message: err.message || 'Đã xảy ra lỗi server'
-  });
-};
+    message: err.message || 'Đã xảy ra lỗi trên máy chủ'
+  };
+  
+  // Thêm thông tin lỗi chi tiết trong môi trường phát triển
+  if (process.env.NODE_ENV === 'development') {
+    errorResponse.stack = err.stack;
+  }
+  
+  // Gửi phản hồi lỗi
+  res.status(statusCode).json(errorResponse);
+}
+
+module.exports = errorHandler;

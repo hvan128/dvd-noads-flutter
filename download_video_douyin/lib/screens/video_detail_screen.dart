@@ -8,9 +8,11 @@ import '../models/douyin_video.dart';
 import '../services/douyin_service.dart';
 
 class VideoDetailScreen extends StatefulWidget {
+  final bool loading;
   final DouyinVideo video;
 
-  const VideoDetailScreen({Key? key, required this.video}) : super(key: key);
+  const VideoDetailScreen(
+      {super.key, required this.video, this.loading = false});
 
   @override
   State<VideoDetailScreen> createState() => _VideoDetailScreenState();
@@ -48,11 +50,22 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
 
     setState(() {
       _isDownloading = true;
+      _downloadProgress = 0.0;
       _statusMessage = 'Đang chuẩn bị tải xuống...';
     });
 
     try {
-      final filePath = await _douyinService.downloadContent(widget.video);
+      // Thêm callback để cập nhật tiến trình
+      final filePath = await _douyinService.downloadContent(
+        widget.video,
+        onProgress: (progress) {
+          setState(() {
+            _downloadProgress = progress;
+            _statusMessage =
+                'Đang tải xuống: ${(progress * 100).toStringAsFixed(0)}%';
+          });
+        },
+      );
 
       setState(() {
         _downloadedFilePath = filePath;
@@ -152,9 +165,35 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                     ),
                   const SizedBox(height: 16),
 
+                  // Hiển thị thanh tiến trình khi đang tải xuống
+                  if (_isDownloading)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Hiển thị thanh tiến trình
+                        LinearProgressIndicator(
+                          value: _downloadProgress,
+                          backgroundColor: Colors.grey[300],
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.blue),
+                        ),
+                        const SizedBox(height: 8),
+                        // Hiển thị phần trăm
+                        Text(
+                          '${(_downloadProgress * 100).toStringAsFixed(0)}%',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+
                   // Hiển thị thông báo trạng thái
                   if (_statusMessage.isNotEmpty)
                     Container(
+                      margin: const EdgeInsets.only(top: 8),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: _statusMessage.contains('Lỗi')
@@ -169,46 +208,52 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
 
                   // Nút điều khiển
                   if (_isDownloading)
-                    const Center(child: CircularProgressIndicator())
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.cancel),
+                      label: const Text('Hủy tải xuống'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: Colors.red,
+                      ),
+                      onPressed: () {
+                        // Thêm logic hủy tải xuống ở đây
+                        setState(() {
+                          _isDownloading = false;
+                          _statusMessage = 'Đã hủy tải xuống';
+                        });
+                      },
+                    )
+                  else if (_downloadedFilePath == null)
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.download),
+                      label: Text(
+                          'Tải ${widget.video.type == 'video' ? 'video' : 'hình ảnh'}'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: _downloadContent,
+                    )
                   else
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (_downloadedFilePath == null)
-                          ElevatedButton.icon(
-                            icon: const Icon(Icons.download),
-                            label: Text(
-                                'Tải ${widget.video.type == 'video' ? 'video' : 'hình ảnh'}'),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                            onPressed: _downloadContent,
-                          )
-                        else
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              ElevatedButton.icon(
-                                icon: const Icon(Icons.open_in_new),
-                                label: const Text('Mở file đã tải'),
-                                style: ElevatedButton.styleFrom(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 12),
-                                ),
-                                onPressed: _openDownloadedFile,
-                              ),
-                              const SizedBox(height: 8),
-                              ElevatedButton.icon(
-                                icon: const Icon(Icons.share),
-                                label: const Text('Chia sẻ'),
-                                style: ElevatedButton.styleFrom(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 12),
-                                ),
-                                onPressed: _shareFile,
-                              ),
-                            ],
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.open_in_new),
+                          label: const Text('Mở file đã tải'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
+                          onPressed: _openDownloadedFile,
+                        ),
+                        const SizedBox(height: 8),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.share),
+                          label: const Text('Chia sẻ'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          onPressed: _shareFile,
+                        ),
                       ],
                     ),
                 ],

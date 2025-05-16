@@ -1,7 +1,40 @@
-/node_modules
-/.env
-# Loại trừ tất cả nội dung trong thư mục downloads
-/downloads/*
+# Node modules
+node_modules/
 
-# Nhưng giữ lại file .gitkeep
-!/downloads/.gitkeep
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE and editor files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# Production build
+dist/
+build/
+
+# Debug files
+.nyc_output/
+coverage/
+
+# Temp files
+.tmp/
+.cache/
+temp/
+
+# Local development settings
+.nodemon-debug.json

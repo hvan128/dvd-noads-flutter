@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:douyin_downloader/components/video_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:clipboard/clipboard.dart';
@@ -19,6 +20,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = false;
   String _errorMessage = '';
   StreamSubscription? _intentDataStreamSubscription;
+  DouyinVideo? _video;
+  String? _downloadedFilePath;
 
   @override
   void initState() {
@@ -118,14 +121,11 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
         _stopTimer();
       });
-
-      // Chuyển đến màn hình chi tiết video
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => VideoDetailScreen(video: video),
-        ),
-      );
+      setState(() {
+        _video = video;
+        _downloadedFilePath = null;
+        _errorMessage = '';
+      });
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -140,9 +140,12 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final clipboardData = await FlutterClipboard.paste();
       setState(() {
+        _video = null;
+        _downloadedFilePath = null;
         _urlController.text = clipboardData;
         _errorMessage = '';
       });
+      _getVideoInfo();
     } catch (e) {
       setState(() {
         _errorMessage = 'Không thể truy cập clipboard';
@@ -150,112 +153,122 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Widget _buildPasteButton() {
+    return GestureDetector(
+      onTap: _isLoading ? null : _pasteFromClipboard,
+      child: Container(
+        width: 300,
+        height: 300,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF00C6FF), // Cyan sáng
+              Color(0xFF0072FF), // Xanh dương đậm
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.5),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.content_paste_rounded,
+              color: Colors.white,
+              size: 40,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Paste',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 40,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Douyin Downloader'),
-        centerTitle: true,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Logo hoặc icon ứng dụng
-            const SizedBox(height: 40),
-            Icon(
-              Icons.play_circle_filled,
-              size: 80,
-              color: Theme.of(context).primaryColor,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Tải video từ Douyin',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 40),
-
-            // Trường nhập URL
-            TextField(
-              controller: _urlController,
-              decoration: InputDecoration(
-                labelText: 'Nhập URL Douyin',
-                hintText: 'https://v.douyin.com/xxxxx/',
-                border: OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.paste),
-                  onPressed: _pasteFromClipboard,
-                  tooltip: 'Dán từ clipboard',
+          title: const Text('Douyin Downloader'),
+          centerTitle: true,
+          shadowColor: Color(0xFF1E2A38),
+          backgroundColor: Color(0xFF1E2A38)),
+      body: Container(
+        height: MediaQuery.of(context).size.height,
+        width: double.infinity,   
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFF1E2A38),
+              Color(0xFF4C9AFF),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Logo hoặc icon ứng dụng
+                const SizedBox(height: 40),
+                _buildPasteButton(),
+                const SizedBox(height: 20),
+                const Text(
+                  'Just copy your link and tap paste!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.go,
-              onSubmitted: (_) => _getVideoInfo(),
-            ),
-            const SizedBox(height: 8),
-
-            // Hiển thị thông báo lỗi nếu có
-            if (_errorMessage.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  _errorMessage,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ),
-
-            const SizedBox(height: 20),
-
-            // Nút tải video
-            ElevatedButton(
-              onPressed: _isLoading ? null : _getVideoInfo,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: _isLoading
-                  ? Text(
-                      'Đang tải... $_secondsElapsed giây',
-                      style: const TextStyle(fontSize: 16),
-                    )
-                  : const Text(
-                      'Lấy thông tin video',
-                      style: TextStyle(fontSize: 16),
+                const SizedBox(height: 20),
+                // Hiển thị thông báo lỗi nếu có
+                if (_errorMessage.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      _errorMessage,
+                      style: const TextStyle(color: Color(0xFFEF4444)),
                     ),
-            ),
+                  ),
 
-            const SizedBox(height: 24),
-
-            // Hướng dẫn sử dụng
-            const Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Hướng dẫn:',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                _video == null && !_isLoading
+                    ? const SizedBox
+                        .shrink() // Không có dữ liệu và không loading
+                    : VideoCard(
+                        video: _video ??
+                            DouyinVideo(
+                                author: "",
+                                cover: "",
+                                desc: "",
+                                id: "",
+                                type: ""), // Cung cấp video dummy nếu null
+                        isLoading:
+                            _isLoading, // Thêm thuộc tính isLoading vào VideoCard
                       ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      '1. Sao chép URL video từ ứng dụng Douyin\n'
-                      '2. Dán URL vào ô trên\n'
-                      '3. Nhấn "Lấy thông tin video"\n'
-                      '4. Xem và tải xuống video',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                  ],
-                ),
-              ),
+                const SizedBox(height: 24),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

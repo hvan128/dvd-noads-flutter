@@ -1,0 +1,150 @@
+# Douyin Video Downloader API
+
+API NodeJS để trích xuất và tải xuống video từ nền tảng Douyin (TikTok Trung Quốc).
+
+## Tính năng
+
+- Trích xuất thông tin video/hình ảnh từ liên kết Douyin
+- Lấy URL trực tiếp để tải xuống video/hình ảnh
+- Hỗ trợ cả bài đăng video và hình ảnh
+- Xử lý liên kết rút gọn và chuyển hướng
+
+## Yêu cầu
+
+- Node.js 16+
+- NPM hoặc Yarn
+
+## Cài đặt
+
+### Cài đặt thủ công
+
+1. Clone repository:
+
+```bash
+git clone https://github.com/yourusername/douyin-downloader.git
+cd douyin-downloader
+```
+
+2. Cài đặt dependencies:
+
+```bash
+npm install
+```
+
+3. Tạo file `.env` (tuỳ chọn):
+
+```bash
+# Port server
+PORT=3000
+
+# Môi trường (development hoặc production)
+NODE_ENV=development
+
+# Biến cho môi trường Render (nếu triển khai trên Render)
+RENDER=false
+```
+
+4. Khởi động server:
+
+```bash
+npm start
+```
+
+Hoặc chế độ phát triển (với nodemon):
+
+```bash
+npm run dev
+```
+
+### Sử dụng Docker (tuỳ chọn)
+
+```bash
+docker build -t douyin-downloader .
+docker run -p 3000:3000 douyin-downloader
+```
+
+## API Endpoints
+
+### 1. Lấy thông tin video
+
+**Endpoint:** `POST /api/info`
+
+**Payload:**
+
+```json
+{
+  "url": "https://www.douyin.com/video/7123456789"
+}
+```
+
+**Response thành công:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "7123456789",
+    "desc": "Mô tả video",
+    "author": "Tên tác giả",
+    "cover": "URL ảnh thumbnail",
+    "type": "video",
+    "videoUrl": "URL video trực tiếp"
+  }
+}
+```
+
+### 2. Lấy URL tải xuống
+
+**Endpoint:** `POST /api/get-download-url`
+
+**Payload cho video:**
+
+```json
+{
+  "url": "https://www.douyin.com/video/7123456789",
+  "type": "video",
+  "videoUrl": "URL video từ endpoint info"
+}
+```
+
+**Payload cho hình ảnh:**
+
+```json
+{
+  "url": "https://www.douyin.com/note/7123456789",
+  "type": "images",
+  "images": ["URL hình ảnh 1", "URL hình ảnh 2"]
+}
+```
+
+**Response thành công cho video:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "type": "video",
+    "url": "URL video trực tiếp",
+    "filename": "douyin_video_abcd1234.mp4"
+  }
+}
+```
+
+## Triển khai
+
+Dự án có thể được triển khai trên các nền tảng như:
+
+- Render
+- Heroku
+- Railway
+- Các VPS chạy Node.js
+
+## Lưu ý
+
+- API này được thiết kế cho mục đích giáo dục và cá nhân
+- Hãy tôn trọng quyền sở hữu trí tuệ và bản quyền của nội dung
+- Hiệu suất có thể bị ảnh hưởng bởi các thay đổi API của Douyin
+
+## License
+
+ISC

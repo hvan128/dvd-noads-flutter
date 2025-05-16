@@ -36,7 +36,10 @@ class DouyinService {
   }
 
   /// Tải xuống video hoặc hình ảnh sử dụng API mới
-Future<String> downloadContent(DouyinVideo video) async {
+Future<String> downloadContent(
+  DouyinVideo video, {
+  Function(double progress)? onProgress,
+}) async {
   try {
     // Chuẩn bị dữ liệu cho request lấy URL tải xuống
     final Map<String, dynamic> requestData = {
@@ -78,7 +81,10 @@ Future<String> downloadContent(DouyinVideo video) async {
             filePath,
             onReceiveProgress: (received, total) {
               if (total != -1) {
-                print('Đã tải video: ${(received / total * 100).toStringAsFixed(0)}%');
+                final progress = received / total;
+                // Cập nhật tiến trình cho UI
+                onProgress?.call(progress);
+                print('Đã tải video: ${(progress * 100).toStringAsFixed(0)}%');
               }
             },
           );
@@ -99,6 +105,10 @@ Future<String> downloadContent(DouyinVideo video) async {
           final List<String> imageUrls = List<String>.from(data['urls']);
           final List<String> downloadedPaths = [];
           
+          // Tính toán tiến trình tổng thể cho nhiều hình ảnh
+          double totalProgress = 0.0;
+          double progressPerImage = 1.0 / imageUrls.length;
+          
           for (int i = 0; i < imageUrls.length; i++) {
             final String imagePath = '$folderPath/image_${i+1}.jpg';
             await _dio.download(
@@ -106,10 +116,22 @@ Future<String> downloadContent(DouyinVideo video) async {
               imagePath,
               onReceiveProgress: (received, total) {
                 if (total != -1) {
-                  print('Đã tải ảnh ${i+1}: ${(received / total * 100).toStringAsFixed(0)}%');
+                  // Tính toán tiến trình cho từng hình ảnh và toàn bộ quá trình
+                  double imageProgress = received / total;
+                  double currentImageContribution = imageProgress * progressPerImage;
+                  double overallProgress = totalProgress + currentImageContribution;
+                  
+                  // Cập nhật tiến trình cho UI
+                  onProgress?.call(overallProgress);
+                  print('Đã tải ảnh ${i+1}: ${(imageProgress * 100).toStringAsFixed(0)}%');
                 }
               },
             );
+            
+            // Cập nhật tiến trình sau khi tải xong từng hình ảnh
+            totalProgress += progressPerImage;
+            onProgress?.call(totalProgress);
+            
             downloadedPaths.add(imagePath);
           }
           
@@ -129,7 +151,6 @@ Future<String> downloadContent(DouyinVideo video) async {
     throw Exception('Không thể tải xuống nội dung: $e');
   }
 }
-
 // Nếu bạn muốn thêm tính năng nén nhiều hình ảnh thành file zip, có thể thêm hàm này
 Future<String> _compressImagesToZip(List<String> imagePaths, String outputPath) async {
   try {
