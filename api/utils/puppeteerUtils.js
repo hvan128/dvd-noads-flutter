@@ -95,7 +95,7 @@ async function getVideoDataUsingPuppeteer(videoId) {
     await page.goto(videoUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
     console.log(`[INFO] Đã truy cập trang video: ${videoUrl}`);
     
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await new Promise(resolve => setTimeout(resolve, 20000));
     
     return videoData;
   } catch (error) {
