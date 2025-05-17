@@ -1,7 +1,7 @@
    // utils/puppeteerUtils.js - Các hàm liên quan đến puppeteer
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const { IS_RENDER_ENVIRONMENT, PUPPETEER_EXECUTABLE_PATH, USER_AGENT } = require('../config/config');
+const { PUPPETEER_EXECUTABLE_PATH, USER_AGENT } = require('../config/config');
 
 // Sử dụng plugin Stealth để tránh phát hiện bot
 puppeteer.use(StealthPlugin());
@@ -10,10 +10,10 @@ puppeteer.use(StealthPlugin());
  * Cấu hình và khởi chạy trình duyệt Puppeteer
  * @returns {Promise<Browser>} Instance của trình duyệt
  */
-async function launchBrowser() {
-  console.log(`[INFO] Đang chạy trong môi trường: ${IS_RENDER_ENVIRONMENT ? 'Render' : 'Local'}`);
-  
+async function launchBrowser() {  
+  // Cấu hình khởi chạy puppeteer dựa vào môi trường
   const launchOptions = {
+    executablePath: PUPPETEER_EXECUTABLE_PATH,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
