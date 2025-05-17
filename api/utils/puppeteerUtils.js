@@ -205,5 +205,5 @@ async function getVideoDataUsingPuppeteer(videoId) {
 
 module.exports = {
   getVideoDataUsingPuppeteer,
-  launchBrowser
+  launchBrowser,
 };
