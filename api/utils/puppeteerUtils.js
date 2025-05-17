@@ -1,4 +1,3 @@
-   // utils/puppeteerUtils.js - Các hàm liên quan đến puppeteer
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const { USER_AGENT } = require('../config/config');
@@ -16,9 +15,12 @@ async function launchBrowser() {
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage'
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--window-size=1920,1080'
     ],
-    headless: 'new'
+    headless: 'new',
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome'
   };
   
   return await puppeteer.launch(launchOptions);
@@ -95,7 +97,8 @@ async function getVideoDataUsingPuppeteer(videoId) {
     await page.goto(videoUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
     console.log(`[INFO] Đã truy cập trang video: ${videoUrl}`);
     
-    await new Promise(resolve => setTimeout(resolve, 50000));
+    // Giảm thời gian chờ xuống phù hợp hơn
+    await new Promise(resolve => setTimeout(resolve, 8000));
     
     return videoData;
   } catch (error) {
