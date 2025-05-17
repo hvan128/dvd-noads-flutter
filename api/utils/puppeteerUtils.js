@@ -13,7 +13,6 @@ puppeteer.use(StealthPlugin());
 async function launchBrowser() {  
   // Cấu hình khởi chạy puppeteer dựa vào môi trường
   const launchOptions = {
-    executablePath: PUPPETEER_EXECUTABLE_PATH,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -96,7 +95,7 @@ async function getVideoDataUsingPuppeteer(videoId) {
     await page.goto(videoUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
     console.log(`[INFO] Đã truy cập trang video: ${videoUrl}`);
     
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 5000));
     
     return videoData;
   } catch (error) {
