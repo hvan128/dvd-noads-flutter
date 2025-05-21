@@ -8,17 +8,17 @@
  * @returns {string} URL Douyin đã làm sạch
  */
 function cleanUrl(url) {
-  // Tìm URL Douyin trong chuỗi đầu vào
-  const douyinUrlMatch = url.match(/https?:\/\/v\.douyin\.com\/[a-zA-Z0-9]+/);
+  // Tìm URL Douyin dạng rút gọn, có thể chứa dấu -
+  const douyinUrlMatch = url.match(/https?:\/\/v\.douyin\.com\/[\w-]+/);
   if (douyinUrlMatch) {
     return douyinUrlMatch[0];
   }
-  
+
   // Nếu đã là URL đầy đủ của Douyin
   if (url.startsWith('https://www.douyin.com/')) {
     return url;
   }
-  
+
   return url; // Trả về URL gốc nếu không tìm thấy mẫu nào
 }
 
