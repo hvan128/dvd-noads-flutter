@@ -33,4 +33,21 @@ class DouyinVideo {
       images: imagesList,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'desc': desc,
+      'author': author,
+      'cover': cover,
+      'type': type,
+      if (images != null) 'images': images,
+      if (videoUrl != null) 'videoUrl': videoUrl,
+    };
+  }
+
+  @override
+  String toString() {
+    return 'DouyinVideo{id: $id, desc: $desc, author: $author, cover: $cover, type: $type, videoUrl: $videoUrl, images: $images}';
+  }
 }

@@ -19,7 +19,7 @@ class _VideoCardSkeletonState extends State<VideoCardSkeleton>
     
     // Initialize animation controller for progress indicator
     _progressController = AnimationController(
-      duration: const Duration(seconds: 5), // Animation runs for 3 seconds
+      duration: const Duration(milliseconds: 1500), // Animation runs for 3 seconds
       vsync: this,
     );
 
