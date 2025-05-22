@@ -109,7 +109,7 @@ function processVideoData(videoData) {
 }
 
 async function getVideoDataUsing3rdPartyApi(videoId) {
-  const apiUrl = 'https://douyin.wtf/api/douyin/web/fetch_one_video';
+  const apiUrl = 'http://35.241.110.76/api/douyin/web/fetch_one_video';
   const headers = {
     'User-Agent': USER_AGENT,
     'Content-Type': 'application/json'
