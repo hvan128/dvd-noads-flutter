@@ -8,7 +8,7 @@ import '../models/douyin_video.dart';
 class DouyinService {
   // Thay đổi API_BASE_URL thành URL thực của server của bạn
   // static const String API_BASE_URL = 'http://192.168.100.9:3000';
-  static const String API_BASE_URL = 'http://35.235.244.65:3000';
+  static const String API_BASE_URL = 'http://34.92.49.75:3000';
   // static const String API_BASE_URL = 'https://dvd-noads-flutter.onrender.com';
   final Dio _dio = Dio();
 
