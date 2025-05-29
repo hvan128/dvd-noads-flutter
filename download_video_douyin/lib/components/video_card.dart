@@ -2,6 +2,7 @@ import 'package:douyin_downloader/components/skeleton.dart';
 import 'package:douyin_downloader/models/douyin_video.dart';
 import 'package:douyin_downloader/services/douyin_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gallery_saver_plus/gallery_saver.dart';
 import 'dart:io';
 import 'package:open_file/open_file.dart'; // Thêm package để mở file
@@ -144,7 +145,7 @@ class _VideoCardState extends State<VideoCard> {
                             ],
                           ),
                         ),
-                        
+
                         // Status message
                         if (_statusMessage.isNotEmpty)
                           Container(
@@ -159,7 +160,7 @@ class _VideoCardState extends State<VideoCard> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          
+
                         // Action buttons
                         Row(
                           mainAxisAlignment: MainAxisAlignment.start,
@@ -190,6 +191,18 @@ class _VideoCardState extends State<VideoCard> {
                                 ),
                                 tooltip: 'Mở file',
                               ),
+                            // Copy prompt button
+                            IconButton(
+                              onPressed: () {
+                                _copyPrompt(widget.video.cover, widget.video.desc);
+                              },
+                              icon: const Icon(
+                                Icons.copy,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                              tooltip: 'Sao chép prompt',
+                            ),
                             // Share button
                             IconButton(
                               onPressed: () {
@@ -248,58 +261,58 @@ class _VideoCardState extends State<VideoCard> {
   }
 
   Future<void> _downloadContent() async {
-  if (_isDownloading) return;
-
-  setState(() {
-    _isDownloading = true;
-    // Bắt đầu từ 28% (vì skeleton đã hiển thị loading từ 0-28%)
-    _downloadProgress = 0.28;
-    _statusMessage = 'Bắt đầu tải xuống...';
-  });
-
-  try {
-    // Thêm callback để cập nhật tiến trình
-    final filePath = await _douyinService.downloadContent(
-      widget.video,
-      onProgress: (progress) {
-        setState(() {
-          // Điều chỉnh tiến trình để bắt đầu từ 28% và kết thúc ở 100%
-          // Công thức: 0.28 + (progress * 0.72)
-          // 0.72 = (1.0 - 0.28) để đảm bảo kết thúc ở 100%
-          _downloadProgress = 0.28 + (progress * 0.72);
-          _statusMessage =
-              'Đang tải xuống: ${(_downloadProgress * 100).toStringAsFixed(0)}%';
-        });
-      },
-    );
+    if (_isDownloading) return;
 
     setState(() {
-      _downloadedFilePath = filePath;
-      _statusMessage = 'Đã tải xuống thành công!';
-      _isDownloaded = true;
-      _downloadProgress = 1.0; // Đảm bảo tiến trình hiển thị đúng 100%
+      _isDownloading = true;
+      // Bắt đầu từ 28% (vì skeleton đã hiển thị loading từ 0-28%)
+      _downloadProgress = 0.28;
+      _statusMessage = 'Bắt đầu tải xuống...';
     });
 
-    // Lưu vào thư viện nếu là video
-    if (widget.video.type == 'video') {
-      final success = await GallerySaver.saveVideo(filePath);
-      if (success == true) {
-        setState(() {
-          _statusMessage = 'Đã lưu video vào thư viện!';
-        });
+    try {
+      // Thêm callback để cập nhật tiến trình
+      final filePath = await _douyinService.downloadContent(
+        widget.video,
+        onProgress: (progress) {
+          setState(() {
+            // Điều chỉnh tiến trình để bắt đầu từ 28% và kết thúc ở 100%
+            // Công thức: 0.28 + (progress * 0.72)
+            // 0.72 = (1.0 - 0.28) để đảm bảo kết thúc ở 100%
+            _downloadProgress = 0.28 + (progress * 0.72);
+            _statusMessage =
+                'Đang tải xuống: ${(_downloadProgress * 100).toStringAsFixed(0)}%';
+          });
+        },
+      );
+
+      setState(() {
+        _downloadedFilePath = filePath;
+        _statusMessage = 'Đã tải xuống thành công!';
+        _isDownloaded = true;
+        _downloadProgress = 1.0; // Đảm bảo tiến trình hiển thị đúng 100%
+      });
+
+      // Lưu vào thư viện nếu là video
+      if (widget.video.type == 'video') {
+        final success = await GallerySaver.saveVideo(filePath);
+        if (success == true) {
+          setState(() {
+            _statusMessage = 'Đã lưu video vào thư viện!';
+          });
+        }
       }
+    } catch (e) {
+      setState(() {
+        _statusMessage = 'Lỗi: ${e.toString()}';
+      });
+    } finally {
+      setState(() {
+        _isDownloading = false;
+      });
     }
-  } catch (e) {
-    setState(() {
-      _statusMessage = 'Lỗi: ${e.toString()}';
-    });
-  } finally {
-    setState(() {
-      _isDownloading = false;
-    });
   }
-}
-  
+
   // Hàm mở file đã tải xuống
   void _openDownloadedFile() {
     if (_downloadedFilePath != null) {
@@ -313,4 +326,26 @@ class _VideoCardState extends State<VideoCard> {
       }
     }
   }
-} 
+
+  void _copyPrompt(String cover, String desc) {
+    final String prompt =
+        '''Given the following video description and thumbnail image, generate 5 catchy and curiosity-driven titles for a YouTube Shorts video in English.
+            The titles should:
+            – Be short and attention-grabbing (under 50 characters if possible)
+            – Make viewers want to watch until the end or comment
+            – Use tones such as: clever trick, unexpected method, genius hack, simple solution, or “can’t believe this works”
+            – Translate each title into Vietnamese right below it
+
+            Video Description:
+            $desc
+
+            Thumbnail Image:
+            $cover''';
+    Clipboard.setData(ClipboardData(text: prompt));
+    ScaffoldMessenger.of(context).showSnackBar( 
+      const SnackBar(
+        content: Text('Đã sao chép vào clipboard!'), 
+      ),
+    );
+  }
+}
